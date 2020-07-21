@@ -33,6 +33,8 @@ library(broom)
 library(skimr)
 library(nnet)
 library(stargazer)
+
+theme_set(theme_bw())
 ```
 
 ```{r functions}
@@ -133,17 +135,120 @@ dat_clean <- dat_fr %>%
              "altro_dolori_articolari_diffusi_dismorfismi_dita_prematurità_postumi_di_intervento_scialorrea" = "altro_dolori",
              "alterazioni_del_tono_muscolare" = "alterazioni_tono_muscolare",
              "difficoltà_alla_suzione" = "suzione"
-            )) 
-```
+            )) %>% 
+  mutate(eta_paziente = floor(as.numeric(as.duration(data_visita - ddn), "months"))) %>% 
+ 
+  # negative age? 
+  filter(eta_paziente > 0) %>% 
+  
+  # drop NA mdc1
+  
+  drop_na(mdc_1) 
 
+
+```
 
 
 ```{r}
 skim(dat_clean)
 ```
 
+# Descrizione Variabili
+
+# Compione di osservazioni
+
+Nel corso di 3 anni (2017-2019), il nostro studio ha registrato informazioni riguardanti il trattamento osteopatico di 1288 pazienti di età compreasa tra  1 mese ai 16 anni (fig.1). 
+Circa 90% dei soggetti del nostro campione e' nato per fecondazione naturale, e 58% maschi, 
+
+Circa 60% dei soggetti nel nostro campione è di sesso maschile, ed e' nato da parto naturale 
+
+
+```{r eval=FALSE}
+c(min(dat_clean$eta_paziente), max(dat_clean$eta_paziente)/12)
+```
+
+```{r}
+dat_clean %>% 
+  group_by(sesso) %>% 
+  summarize(n = n()) %>%
+  pivot_wider(names_from = "sesso", values_from = "n") %>% 
+  mutate(ratio = m/(f + m))
+
+
+dat_clean %>% 
+  group_by(tipo_fecondazione) %>% 
+  summarize(n = n()) %>% 
+  na.omit() %>% 
+  pivot_wider(names_from = "tipo_fecondazione", values_from = "n") %>% 
+  mutate(ratio = naturale/(assistita + naturale))
+
+```
+
+
+
+
+```{r}
+dat_clean %>% 
+  mutate(eta_paziente = floor(eta_paziente/12)) %>% 
+  group_by(sesso, eta_paziente) %>% 
+  summarize(n = n(), .groups = "drop_last") %>% 
+  
+  ggplot(aes(eta_paziente, n, fill = sesso)) +
+    geom_col() +
+    facet_grid(vars(sesso)) +
+    labs(title = "Distribuzione pazienti per sesso ed età",
+         caption = "fig.1"
+         )
+    
+```
+
+
+
+```{r}
+dat_clean %>% 
+  mutate(tot = n()) %>% 
+  group_by(mdc_1) %>% 
+  summarize(n = n(),  tot  = first(tot), perc_mdc_1 = round(n/first(tot) * 100, 1)) %>% 
+  arrange(desc(perc_mdc_1)) 
+
+ #  
+ #  
+ #  ggplot(aes(reorder(mdc_1, perc_mdc_1), n)) +
+ #      geom_col() +
+ #  labs(
+ #    x = "motivo di consulto",
+ #    y =
+ #  ) +
+ # theme(axis.text.x = element_text(angle = 45,  hjust = 1))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
  
-# Correlations
+# Correlazioni
 
 ```{r corr, fig.height=9, fig.width=9}
 dat_clean %>% 
@@ -164,33 +269,7 @@ dat_clean %>%
 <!-- ``` -->
 
 
-```{r}
-dat_clean %>% 
-  group_by(codice_mdc_1) %>% 
-  summarize(n = n()) %>% 
-  arrange(desc(n))
-  
-  ggplot(aes(reorder(codice_mdc_1, n), n)) +
-      geom_col() +
-  labs(
-    x = "codice_mdc_1"
-  )
-```
-```{r}
-unique(dat_clean$mdc_1)
-```
 
-
-
-
-```{r}
-to_filter <- dat_clean %>% 
-  group_by(codice_mdc_1) %>% 
-  summarize(n = n()) %>% 
-  arrange(desc(n)) %>% 
-  head(3) %>% 
-  distinct(codice_mdc_1)
-```
 
 
 
@@ -200,29 +279,21 @@ to_filter <- dat_clean %>%
 
 ```{r results ='asis', message=FALSE}
 m1 <- dat_clean %>%
-  filter(codice_mdc_1 %in% !! unlist(to_filter)) %>% 
-  mutate(mdc_1 = droplevels(mdc_1)) %>% 
-  select(mdc_1 , sesso, tipo_di_parto, eta_della_madre_al_momento_del_parto) %>%
-  na.omit() %>%
-
-  multinom(mdc_1   ~   ., dat = . )
-
-m1_rr = exp(coef(m1))
-
-stargazer(m1, type="html", coef=list(m1_rr), p.auto=FALSE)
+#   filter(codice_mdc_1 %in% !! unlist(to_filter)) %>% 
+#   mutate(mdc_1 = droplevels(mdc_1)) %>% 
+#   select(mdc_1 , sesso, tipo_di_parto, eta_della_madre_al_momento_del_parto) %>%
+#   na.omit() %>%
+# 
+#   multinom(mdc_1   ~   ., dat = . )
+# 
+# m1_rr = exp(coef(m1))
+# 
+# stargazer(m1, type="html", coef=list(m1_rr), p.auto=FALSE)
 
 ```
 
 
 
-
-
-
-
-
-```{r}
- unique(dat_clean$situazione_e_presentazione)
-```
 
 
 
