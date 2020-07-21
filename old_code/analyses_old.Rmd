@@ -1,0 +1,85 @@
+---
+title: "Explorative Analyses"
+author: "Claudio Zanettini"
+date:  "`r Sys.time()`"
+output: 
+  html_document:
+    df_print: kable
+    toc: true
+    theme: journal
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(
+   comment = "#>", 
+   echo = FALSE
+)
+```   
+
+```{r libraries, message=FALSE}
+library(here)
+library(tidyverse)
+library(readxl)
+library(stringr)
+library(janitor)
+
+```
+
+
+```{r}
+files_to_import_name <- grep("^[2]", list.files(here("data")), value = TRUE)
+files_to_import <- here("data", files_to_import_name)
+
+# import each, clean names and rename element list
+dat_fr <- lapply(files_to_import, function(x) read_excel(x) %>% clean_names())
+
+names(dat_fr) <- paste0("y_", str_remove_all(files_to_import_name, "[A-z]|[[:punct:]]"))
+```
+
+You can't import and bind the dataframe because are of different type.
+This is a mess.
+
+```{r}
+# Compare and find columns with different type
+dat_comparison <- map_dfr(dat_fr, function(x) sapply(x, typeof), .id = "id")
+
+dat_comparison 
+
+# len_dat_c <- map_dfr(map(dat_c, unique), length) 
+# trans_len_dat_c <- as.data.frame(cbind(names(x), unlist(x[1,])))
+# 
+# names(trans_len_dat_c) <- c("column", "uniques")
+# row.names(trans_len_dat_c) <- NULL
+# trans_len_dat_c %>% 
+#   filter(uniques > 1)
+```
+Beside that some columns are present in one dataframe but not in the others.
+
+has different names in different datasets: 
+`eta_della_mamma_alla_nascita`, `eta_mamma_al_momento_del_parto`, `mamma_nome_e_eta`
+
+`GEMELLARITÀ` ?
+
+
+# Check NAs
+
+Let's check NAs
+
+NAs in 
+
+```{r}
+# identify position of NAs
+
+NA_data_1_visita <- which(is.na(as.numeric(dat_fr$y_2019$data_1_visita)))
+
+# find values before transformation
+na.omit(dat_fr$y_2019)
+
+```
+
+```{r message=FALSE}
+library(GGally)
+
+ggpairs(airquality)
+```
+

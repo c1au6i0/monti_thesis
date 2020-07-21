@@ -1,0 +1,253 @@
+---
+title: "Explorative Analyses"
+author: "Claudio Zanettini"
+date:  "`r Sys.time()`"
+output: 
+  html_document:
+    df_print: kable
+    toc: true
+    theme: journal
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(
+   # comment = "#>", 
+   echo = FALSE,
+   warning = FALSE,
+   message=FALSE,
+   fig.align = "center"
+)
+```   
+
+```{r  message=FALSE}
+library(here)
+library(tidyverse)
+library(readxl)
+library(stringr)
+library(janitor)
+library(DT)
+library(vroom)
+library(lubridate)
+library(ggcorrplot)
+library(broom)
+library(skimr)
+library(nnet)
+library(stargazer)
+```
+
+```{r functions}
+# thank you slackoverflow
+# https://stackoverflow.com/questions/47886409/r-is-there-a-function-to-clean-factor-levels-characters-columnwise-in-a-data-f
+# #' 'Clean' a character/factor vector like `janitor::clean_names()` does for data frame columns
+# #'
+# #' Most of the internals are from `janitor::clean_names()`
+# #'
+# #' @param x a vector of strings or factors
+# #' @param refactor if `x` is a factor, return a ref-factored factor?
+# #'        Default: `FALSE` == return character vector.
+clean_vec <- function (x, refactor=FALSE) {
+
+  require(magrittr, quietly=TRUE)
+
+  if (!(is.character(x) || is.factor(x))) return(x)
+
+  x_is_factor <- is.factor(x)
+
+  old_names <- as.character(x)
+
+  new_names <- old_names %>%
+    gsub("'", "", .) %>%
+    gsub("\"", "", .) %>%
+    gsub("%", "percent", .) %>%
+    gsub("^[ ]+", "", .) %>%
+    make.names(.) %>%
+    gsub("[.]+", "_", .) %>%
+    gsub("[_]+", "_", .) %>%
+    tolower(.) %>%
+    gsub("_$", "", .)
+
+
+  if (x_is_factor && refactor) factor(new_names) else new_names
+
+}
+```
+
+
+<!-- 1. What is MCC? why there are 4? Why they are repeated? -->
+
+<!-- 2. apgar   -->
+
+# Overview
+
+```{r import_clean}
+dat_fr <- vroom(here("data", "clean_dataset.csv"), 
+    col_names = c(
+       "data_visita",
+        "anno_visita",
+       "luogo_visita",
+       "sesso",
+       "gemellarita",
+       "ddn",
+        "fascia_eta_gestazionale",
+       "fascia_eta_visita",
+       "eta_madre_parto",
+       "inviati",
+       "tipo_fecondazione",
+       "situazione_presenatione",
+       "tipo_parto_amb", # not unique
+       "tipo_parto", # use this
+       "n_gravidanze",
+       "CC" ,
+       "peso",
+       "lunghezza",
+       "apgar_1",
+       "apgar_5",
+       "allattamento",
+       "codice_mdc_1",
+       "mdc_1",
+       "codice_mdc_2",
+       "mdc_2",
+       "codice_mdc_3",
+       "mdc_3",
+       "codice_mdc_4",
+       "mdc_4",
+       "n_trattamenti"
+  ),
+  skip = 1
+)
+                
+                
+dat_clean <- dat_fr %>% 
+  mutate(across(where(is.character), ~ clean_vec(.x))) %>% 
+  mutate(across(where(is.character), ~na_if(.x, "sconosciuto"))) %>% # sconosciuto = NA, mortacci
+  mutate(across(where(is.character),  as.factor)) %>%
+# recode that col that has crazy names, mortacci Davide, potevi pulirla
+ mutate(mdc_full = mdc_1,
+    mdc_1 = recode(mdc_1,
+             "dismorfismi_cranio_facciali" = "dismorfismi_cf",
+             "torcicolli_posturali_che_cmt_api"  = "torcicolli_posturali",
+             "ritardi_e_alterazioni_del_neurosviluppo"   = "ritardi_alt_neuros",
+             "disturbi_della_deambulazione" = "deambulazione",
+             "piedi_torti_posturali_che_ccf" = "piedi_torti",
+             "piedi_piatti_o_cavi" = "piedi_piatti_cavi",
+             "altro_dolori_articolari_diffusi_dismorfismi_dita_prematurità_postumi_di_intervento_scialorrea" = "altro_dolori",
+             "alterazioni_del_tono_muscolare" = "alterazioni_tono_muscolare",
+             "difficoltà_alla_suzione" = "suzione"
+            )) 
+```
+
+
+
+```{r}
+skim(dat_clean)
+```
+
+ 
+# Correlations
+
+```{r corr, fig.height=9, fig.width=9}
+dat_clean %>% 
+  select(where(is.numeric)) %>% 
+    cor(use = "pairwise.complete.obs") %>%
+    ggcorrplot(hc.order = TRUE, tl.cex = 8, lab = TRUE, lab_size = 3) 
+```
+
+<!-- altro_dolori_articolari_diffusi_dismorfismi_dita_prematurità_postumi_di_intervento_scialorrea -->
+
+
+
+<!-- # Regression -->
+
+
+<!-- ```{r} -->
+<!-- unique(dat_clean$mdc_1) -->
+<!-- ``` -->
+
+
+```{r}
+dat_clean %>% 
+  group_by(codice_mdc_1) %>% 
+  summarize(n = n()) %>% 
+  arrange(desc(n))
+  
+  ggplot(aes(reorder(codice_mdc_1, n), n)) +
+      geom_col() +
+  labs(
+    x = "codice_mdc_1"
+  )
+```
+```{r}
+unique(dat_clean$mdc_1)
+```
+
+
+
+
+```{r}
+to_filter <- dat_clean %>% 
+  group_by(codice_mdc_1) %>% 
+  summarize(n = n()) %>% 
+  arrange(desc(n)) %>% 
+  head(3) %>% 
+  distinct(codice_mdc_1)
+```
+
+
+
+
+<!-- https://dss.princeton.edu/training/LogitR101.pdf -->
+<!-- https://stats.idre.ucla.edu/r/dae/multinomial-logistic-regression/ -->
+
+```{r results ='asis', message=FALSE}
+m1 <- dat_clean %>%
+  filter(codice_mdc_1 %in% !! unlist(to_filter)) %>% 
+  mutate(mdc_1 = droplevels(mdc_1)) %>% 
+  select(mdc_1 , sesso, tipo_di_parto, eta_della_madre_al_momento_del_parto) %>%
+  na.omit() %>%
+
+  multinom(mdc_1   ~   ., dat = . )
+
+m1_rr = exp(coef(m1))
+
+stargazer(m1, type="html", coef=list(m1_rr), p.auto=FALSE)
+
+```
+
+
+
+
+
+
+
+
+```{r}
+ unique(dat_clean$situazione_e_presentazione)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
