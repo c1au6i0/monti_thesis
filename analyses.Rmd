@@ -75,11 +75,6 @@ clean_vec <- function (x, refactor=FALSE) {
 ```
 
 
-<!-- 1. What is MCC? why there are 4? Why they are repeated? -->
-
-<!-- 2. apgar   -->
-
-# Overview
 
 ```{r import_clean}
 dat_fr <- vroom(here("data", "clean_dataset.csv"), 
@@ -155,19 +150,38 @@ skim(dat_clean)
 
 # Descrizione Variabili
 
-# Compione di osservazioni
+Non so qui che bisogna mettere.
 
-Nel corso di 3 anni (2017-2019), il nostro studio ha registrato informazioni riguardanti il trattamento osteopatico di 1288 pazienti di età compreasa tra  1 mese ai 16 anni (fig.1). 
-Circa 90% dei soggetti del nostro campione e' nato per fecondazione naturale, e 58% maschi, 
+# Sogetti
 
-Circa 60% dei soggetti nel nostro campione è di sesso maschile, ed e' nato da parto naturale 
+Nel corso di 3 anni (2017-2019), il nostro studio ha registrato informazioni riguardanti il trattamento osteopatico di 1288 pazienti, di cui il 58% (745) di sesso maschile. L'età dei soggetti é compresa tra un  1 mese e i 16 anni, con 76% (979) dei pazienti di età non superiore all'anno di vita (fig.1). 
+
+46% parto cesareo e 42 vaginale, 12% vaginale operativo.
+
+13 fecondazione assistita resto naturale.
 
 
-```{r eval=FALSE}
+
+<!-- 
+https://www.cdc.gov/nchs/fastats/delivery.htm  
+https://www.epicentro.iss.it/percorso-nascita/spinelli
+
+Circa il 32 percento di gravidanze in U.S e' cesarea, 33% in italia
+
+Percio nel vostro campioni i cesarei sono iperrappresentati. Questo puo' essere un caso o dipendere da altri fattori sottesi....parto piu difficoltoso.
+
+Guarda peso bambino che e' nato da cesareo vs normale
+
+ -->
+ 
+
+
+
+```{r eta_min_max, eval=FALSE}
 c(min(dat_clean$eta_paziente), max(dat_clean$eta_paziente)/12)
 ```
 
-```{r}
+```{r sesso_parto, eval = FALSE}
 dat_clean %>% 
   group_by(sesso) %>% 
   summarize(n = n()) %>%
@@ -182,29 +196,105 @@ dat_clean %>%
   pivot_wider(names_from = "tipo_fecondazione", values_from = "n") %>% 
   mutate(ratio = naturale/(assistita + naturale))
 
+
+dat_clean %>% 
+  group_by(tipo_parto) %>% 
+  summarize(n = n()) %>% 
+  na.omit() %>% 
+  pivot_wider(names_from = "tipo_parto", values_from = "n") %>% 
+  mutate(ratio = naturale/(assistita + naturale))
+
 ```
 
 
 
 
-```{r}
+```{r plot_eta_sesso}
 dat_clean %>% 
   mutate(eta_paziente = floor(eta_paziente/12)) %>% 
+  group_by(sesso) %>% 
+  mutate(tot_sesso = n()) %>% 
   group_by(sesso, eta_paziente) %>% 
-  summarize(n = n(), .groups = "drop_last") %>% 
+  summarize(n = n(),
+            perc = n/first(tot_sesso) * 100,
+            
+            .groups = "drop_last") %>% 
   
-  ggplot(aes(eta_paziente, n, fill = sesso)) +
+  ggplot(aes(eta_paziente, perc, fill = sesso)) +
     geom_col() +
     facet_grid(vars(sesso)) +
+    scale_y_continuous(labels = scales::label_percent(scale = 1)) +
+    scale_fill_discrete(labels = c( "f" = "femmina", "m" = "maschio")) +
     labs(title = "Distribuzione pazienti per sesso ed età",
-         caption = "fig.1"
+         caption = "fig.1",
+         y = NULL,
+         x = "età (anni)"
          )
     
 ```
 
 
+```{r eta_tot, eval=FALSE}
+dat_clean %>% 
+  mutate(eta_paziente = floor(eta_paziente/12)) %>% 
+  mutate(tot = n()) %>% 
+  group_by(eta_paziente) %>% 
+  summarize(n = n(),
+            perc = n/first(tot) * 100,
+            
+            .groups = "drop_last")
+```
 
-```{r}
+```{r tipi_parto}
+dat_clean %>% 
+  drop_na(tipo_parto) %>% 
+  mutate(tot = nrow(.)) %>% 
+  group_by(tipo_parto) %>% 
+  summarize(n = n(), perc = n/first(tot) * 100) %>% 
+  # pivot_wider(names_from = "tipo_parto", values_from = "n") %>% 
+  # mutate(tot = sum(.)) %>% 
+  # mutate(across(everything(), ~.x / tot * 100, .names = "perc_{col}")) %>% 
+  # select(starts_with("perc"), - perc_tot) %>% 
+  # pivot_longer(cols = everything()) 
+  ggplot(aes(tipo_parto, perc)) +
+    geom_col() +
+    scale_y_continuous(labels = scales::label_percent(scale = 1)) +
+    scale_x_discrete(labels = c("vaginale_operativo" = "vaginale operativo")) +
+    labs(y = NULL,
+         x = NULL,
+         title = "Tipo di parto",
+         caption = "fig.2") 
+```
+
+```{r peso_tipo}
+dat_clean %>% 
+  drop_na(tipo_parto) %>% 
+  group_by(tipo_parto) %>% 
+  summarize(peso_medio = mean(peso/1000, na.rm = TRUE), peso_sd = sd((peso/1000), na.rm = TRUE)) %>% 
+  ggplot(aes(tipo_parto, peso_medio)) +
+    geom_col() +
+    geom_linerange(aes(ymin = peso_medio + peso_sd, ymax = peso_medio - peso_sd)) +
+    # facet_grid(vars(tipo_parto)) +
+    # scale_y_continuous(labels = scales::label_percent(scale = 1)) +
+    # scale_x_discrete(labels = c("vaginale_operativo" = "vaginale operativo")) +
+    labs(y = "peso +/- Deviazione Standard (kg)",
+         x = NULL,
+         title = "Peso per tipo di parto") 
+
+```
+
+
+```{r tipi_fecondazione}
+dat_clean %>% 
+  drop_na(tipo_fecondazione) %>% 
+  mutate(tot = nrow(.)) %>% 
+  group_by(tipo_fecondazione) %>% 
+  summarize(n = n(), perc = n/first(tot) * 100) 
+```
+
+
+
+```{r perc_mdc_1}
 dat_clean %>% 
   mutate(tot = n()) %>% 
   group_by(mdc_1) %>% 
@@ -221,32 +311,6 @@ dat_clean %>%
  #  ) +
  # theme(axis.text.x = element_text(angle = 45,  hjust = 1))
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
  
 # Correlazioni
 
@@ -256,20 +320,6 @@ dat_clean %>%
     cor(use = "pairwise.complete.obs") %>%
     ggcorrplot(hc.order = TRUE, tl.cex = 8, lab = TRUE, lab_size = 3) 
 ```
-
-<!-- altro_dolori_articolari_diffusi_dismorfismi_dita_prematurità_postumi_di_intervento_scialorrea -->
-
-
-
-<!-- # Regression -->
-
-
-<!-- ```{r} -->
-<!-- unique(dat_clean$mdc_1) -->
-<!-- ``` -->
-
-
-
 
 
 
@@ -289,7 +339,6 @@ m1 <- dat_clean %>%
 # m1_rr = exp(coef(m1))
 # 
 # stargazer(m1, type="html", coef=list(m1_rr), p.auto=FALSE)
-
 ```
 
 
