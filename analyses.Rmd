@@ -154,12 +154,9 @@ Non so qui che bisogna mettere.
 
 # Sogetti
 
-Nel corso di 3 anni (2017-2019), il nostro studio ha registrato informazioni riguardanti il trattamento osteopatico di 1288 pazienti, di cui il 58% (745) di sesso maschile. L'età dei soggetti é compresa tra un  1 mese e i 16 anni, con 76% (979) dei pazienti di età non superiore all'anno di vita (fig.1). 
+Nel corso di 3 anni (2017-2019), il nostro studio ha registrato informazioni riguardanti il trattamento osteopatico di 1288 pazienti, di cui il 58% (745) di sesso maschile. L'età dei soggetti é compresa tra un  1 mese e i 16 anni, con il 76% (979) dei pazienti di età non superiore all'anno di vita (fig.1). 
 
-46% parto cesareo e 42 vaginale, 12% vaginale operativo.
-
-13 fecondazione assistita resto naturale.
-
+Il tipo di parto più frequente è quello cesareo, 46% (577), seguito da quello vaginale e quello vaginale operativo, 42% (534) e 12% (154), rispettivamente (fig.2). Il 13% (159) dei soggetti è nato a sequito di fecondazione assistita e il 10% (130) in parto di tipo gemellare.
 
 
 <!-- 
@@ -168,12 +165,14 @@ https://www.epicentro.iss.it/percorso-nascita/spinelli
 
 Circa il 32 percento di gravidanze in U.S e' cesarea, 33% in italia
 
-Percio nel vostro campioni i cesarei sono iperrappresentati. Questo puo' essere un caso o dipendere da altri fattori sottesi....parto piu difficoltoso.
+Percio nel vostro campioni i cesarei sono iperrappresentati. Questo puo' essere un caso o no
 
 Guarda peso bambino che e' nato da cesareo vs normale
 
  -->
- 
+
+
+
 
 
 
@@ -202,7 +201,16 @@ dat_clean %>%
   summarize(n = n()) %>% 
   na.omit() %>% 
   pivot_wider(names_from = "tipo_parto", values_from = "n") %>% 
-  mutate(ratio = naturale/(assistita + naturale))
+  mutate(tot = sum(.)) %>% 
+  mutate(across(cesareo:vaginale_operativo, ~ .x / tot * 100))
+
+
+dat_clean %>% 
+  drop_na(gemellarita) %>% 
+  group_by(gemellarita) %>% 
+  summarize(n = n()) %>% 
+  pivot_wider(names_from = "gemellarita", values_from = "n")  %>% 
+  mutate(ratio = si/(si + no) * 100)
 
 ```
 
@@ -266,7 +274,7 @@ dat_clean %>%
          caption = "fig.2") 
 ```
 
-```{r peso_tipo}
+```{r peso_tipo, eval = FALSE}
 dat_clean %>% 
   drop_na(tipo_parto) %>% 
   group_by(tipo_parto) %>% 
@@ -276,7 +284,7 @@ dat_clean %>%
     geom_linerange(aes(ymin = peso_medio + peso_sd, ymax = peso_medio - peso_sd)) +
     # facet_grid(vars(tipo_parto)) +
     # scale_y_continuous(labels = scales::label_percent(scale = 1)) +
-    # scale_x_discrete(labels = c("vaginale_operativo" = "vaginale operativo")) +
+    scale_x_discrete(labels = c("vaginale_operativo" = "vaginale operativo")) +
     labs(y = "peso +/- Deviazione Standard (kg)",
          x = NULL,
          title = "Peso per tipo di parto") 
@@ -284,33 +292,50 @@ dat_clean %>%
 ```
 
 
-```{r tipi_fecondazione}
-dat_clean %>% 
-  drop_na(tipo_fecondazione) %>% 
-  mutate(tot = nrow(.)) %>% 
-  group_by(tipo_fecondazione) %>% 
-  summarize(n = n(), perc = n/first(tot) * 100) 
-```
+# Motivi di consulto
 
 
+```{r perc_mdc_1, fig.align="center"}
 
-```{r perc_mdc_1}
+bei_nomi <- c(
+  "dismorfirsmi_cf" = "dismorfirsmi cranio facciali",
+  "visita generale" = "visita generale",
+  "reflusso_ger" = "reflusso ger",
+  "torcicolli_posturali" = "torcicolli posturali",
+  "disturbi_del_sonno" = "disturbi del sonno",
+  "coliche_stipsi_o_dolori_addominali" = "coliche, stipsi o dolori addominali",
+  "piedi_torti" = "piedi torti",
+  "alterazioni_posturali" = "alterazioni posturali"
+)
+
+
 dat_clean %>% 
   mutate(tot = n()) %>% 
   group_by(mdc_1) %>% 
-  summarize(n = n(),  tot  = first(tot), perc_mdc_1 = round(n/first(tot) * 100, 1)) %>% 
-  arrange(desc(perc_mdc_1)) 
+  summarize(n = n(),  tot  = first(tot), perc_mdc_1 = round(n/first(tot) * 100, 1), .groups = "drop_last") %>% 
+  slice_max(perc_mdc_1, n = 10) %>% 
 
- #  
- #  
- #  ggplot(aes(reorder(mdc_1, perc_mdc_1), n)) +
- #      geom_col() +
- #  labs(
- #    x = "motivo di consulto",
- #    y =
- #  ) +
- # theme(axis.text.x = element_text(angle = 45,  hjust = 1))
+  ggplot(aes( perc_mdc_1, reorder(mdc_1, perc_mdc_1))) +
+  scale_x_continuous(labels = scales::label_percent(scale = 1)) +
+  scale_y_discrete(label = bei_nomi) +
+      geom_col() +
+      labs(
+        x = NULL,
+        y = NULL,
+        title = " I dieci motivi di consulto piú frequenti"
+      ) 
 ```
+ 
+
+
+
+
+
+
+
+
+
+ 
  
 # Correlazioni
 
