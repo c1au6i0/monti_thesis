@@ -152,7 +152,7 @@ skim(dat_clean)
 
 Non so qui che bisogna mettere.
 
-# Sogetti
+# Soggetti
 
 Nel corso di 3 anni (2017-2019), il nostro studio ha registrato informazioni riguardanti il trattamento osteopatico di 1288 pazienti, di cui il 58% (745) di sesso maschile. L'età dei soggetti é compresa tra un  1 mese e i 16 anni, con il 76% (979) dei pazienti di età non superiore all'anno di vita (fig.1). 
 
@@ -174,10 +174,9 @@ Guarda peso bambino che e' nato da cesareo vs normale
 
 
 
-
-
 ```{r eta_min_max, eval=FALSE}
 c(min(dat_clean$eta_paziente), max(dat_clean$eta_paziente)/12)
+unique(dat_clean$fascia_eta_gestazionale)
 ```
 
 ```{r sesso_parto, eval = FALSE}
@@ -214,10 +213,22 @@ dat_clean %>%
 
 ```
 
+```{r eta_tot, eval=FALSE}
+dat_clean %>% 
+  mutate(eta_paziente = floor(eta_paziente/12)) %>% 
+  mutate(tot = n()) %>% 
+  group_by(eta_paziente) %>% 
+  summarize(n = n(),
+            perc = n/first(tot) * 100,
+            
+            .groups = "drop_last") %>% 
+  write_csv(x = ., here("tabs", "tab_eta_sesso.csv"))
+```
 
 
 
 ```{r plot_eta_sesso}
+
 dat_clean %>% 
   mutate(eta_paziente = floor(eta_paziente/12)) %>% 
   group_by(sesso) %>% 
@@ -229,50 +240,60 @@ dat_clean %>%
             .groups = "drop_last") %>% 
   
   ggplot(aes(eta_paziente, perc, fill = sesso)) +
-    geom_col() +
-    facet_grid(vars(sesso)) +
+    geom_col(colour = "black") +
+    facet_grid(vars(sesso), labeller = as_labeller(c( "f" = "femmina", "m" = "maschio"))) +
+    scale_fill_manual( values = c("pink", "#56B4E9")) +
     scale_y_continuous(labels = scales::label_percent(scale = 1)) +
-    scale_fill_discrete(labels = c( "f" = "femmina", "m" = "maschio")) +
+    # scale_fill_discrete(labels = c( "f" = "femmine", "m" = "maschi")) +
     labs(title = "Distribuzione pazienti per sesso ed età",
-         caption = "fig.1",
+         # caption = "fig.1",
          y = NULL,
          x = "età (anni)"
-         )
-    
+         ) +
+   theme(legend.position = "none",
+         strip.background =element_rect(fill = "grey90"))
+
+ggsave(here("figs", "fig_eta_sesso.png"))
 ```
 
 
-```{r eta_tot, eval=FALSE}
+
+
+```{r tab_tipo_parto}
 dat_clean %>% 
-  mutate(eta_paziente = floor(eta_paziente/12)) %>% 
-  mutate(tot = n()) %>% 
-  group_by(eta_paziente) %>% 
-  summarize(n = n(),
-            perc = n/first(tot) * 100,
-            
-            .groups = "drop_last")
+  drop_na(tipo_parto) %>% 
+  mutate(tot = nrow(.)) %>% 
+  group_by(tipo_parto) %>% 
+  summarize(n = n(), perc = n/first(tot) * 100, .groups = "drop_last") %>% 
+  write_csv(x = ., here("tabs", "tab_tipo_parto.csv"))
 ```
+
 
 ```{r tipi_parto}
 dat_clean %>% 
   drop_na(tipo_parto) %>% 
   mutate(tot = nrow(.)) %>% 
   group_by(tipo_parto) %>% 
-  summarize(n = n(), perc = n/first(tot) * 100) %>% 
+  summarize(n = n(), perc = n/first(tot) * 100, .groups = "drop_last") %>% 
   # pivot_wider(names_from = "tipo_parto", values_from = "n") %>% 
   # mutate(tot = sum(.)) %>% 
   # mutate(across(everything(), ~.x / tot * 100, .names = "perc_{col}")) %>% 
   # select(starts_with("perc"), - perc_tot) %>% 
   # pivot_longer(cols = everything()) 
   ggplot(aes(tipo_parto, perc)) +
-    geom_col() +
+    geom_col(col = "black", fill = "grey70") +
     scale_y_continuous(labels = scales::label_percent(scale = 1)) +
     scale_x_discrete(labels = c("vaginale_operativo" = "vaginale operativo")) +
     labs(y = NULL,
          x = NULL,
-         title = "Tipo di parto",
-         caption = "fig.2") 
+         title = "Tipo di parto") 
+
+ggsave(here("figs", "fig_tipo_parto.png"))
 ```
+
+
+
+
 
 ```{r peso_tipo, eval = FALSE}
 dat_clean %>% 
@@ -289,16 +310,51 @@ dat_clean %>%
          x = NULL,
          title = "Peso per tipo di parto") 
 
+
+dat_clean %>% 
+  drop_na(tipo_parto, peso) %>% 
+  ggplot(aes(tipo_parto, peso/1000, col = tipo_parto)) +
+    geom_jitter() +
+    # facet_grid(vars(tipo_parto)) +
+    # scale_y_continuous(labels = scales::label_percent(scale = 1)) +
+    scale_x_discrete(labels = c("vaginale_operativo" = "vaginale operativo")) +
+    labs(y = "peso (kg)",
+         x = NULL,
+         title = "Peso per tipo di parto") 
+
+
 ```
 
 
 # Motivi di consulto
 
 
-```{r perc_mdc_1, fig.align="center"}
+Un anno o meno
 
+```{r}
+dat_year <- dat_clean %>% 
+  filter(eta_paziente <= 12)
+```
+
+
+
+```{r tab_perc_medc_1}
+top_mdc_1 <- dat_clean %>% 
+  mutate(tot = n()) %>% 
+  group_by(mdc_1) %>% 
+  summarize(n = n(),  tot  = first(tot), perc_mdc_1 = round(n/first(tot) * 100, 1), .groups = "drop_last") %>% 
+  arrange(desc(n)) %>% 
+  slice_max(perc_mdc_1, n = 10) %>% 
+  distinct(mdc_1) %>% 
+  unlist()
+  # write_csv(x = ., here("tabs", "tab_freq_mdc.csv"))
+  
+```
+
+
+```{r perc_mdc_1, fig.align="center"}
 bei_nomi <- c(
-  "dismorfirsmi_cf" = "dismorfirsmi cranio facciali",
+  "dismorfismi_cf" ="dismorfirsmi cranio facciali",
   "visita generale" = "visita generale",
   "reflusso_ger" = "reflusso ger",
   "torcicolli_posturali" = "torcicolli posturali",
@@ -315,23 +371,100 @@ dat_clean %>%
   summarize(n = n(),  tot  = first(tot), perc_mdc_1 = round(n/first(tot) * 100, 1), .groups = "drop_last") %>% 
   slice_max(perc_mdc_1, n = 10) %>% 
 
-  ggplot(aes( perc_mdc_1, reorder(mdc_1, perc_mdc_1))) +
+  ggplot(aes(perc_mdc_1, reorder(mdc_1, perc_mdc_1))) +
   scale_x_continuous(labels = scales::label_percent(scale = 1)) +
-  scale_y_discrete(label = bei_nomi) +
-      geom_col() +
+  scale_y_discrete(labels = bei_nomi) +
+      geom_col(col = "black", fill = "grey70") +
       labs(
         x = NULL,
-        y = NULL,
+        y = NULL, 
         title = " I dieci motivi di consulto piú frequenti"
-      ) 
+      )
+
+ggsave(here("figs", "fig_mdc1.png"))
 ```
  
+# Un anno o meno
+
+Visita generale e' piu' sano di uno che viene per trattamento specifico? Allora ti aspetti che faccia meno visite...
+
+```{r}
+dat_year %>% 
+  drop_na(tipo_parto) %>% 
+  mutate(gruppo = if_else(mdc_1 == "visita_generale", "visita generale", "problema specifico"))  %>% 
+  group_by(gruppo) %>% 
+  summarize(media_trattamenti = mean(n_trattamenti, na.rm = TRUE), sderr_trattamenti = sd(n_trattamenti, na.rm = TRUE)/sqrt(n())) %>% 
+  
+  ggplot(aes(gruppo, media_trattamenti)) +
+      geom_col() +
+      geom_linerange(aes(ymin = media_trattamenti - sderr_trattamenti, ymax = media_trattamenti + sderr_trattamenti)) 
+
+
+
+dat_year %>% 
+  drop_na(tipo_parto) %>% 
+  mutate(gruppo = if_else(mdc_1 == "visita_generale", "visita generale", "problema specifico"))  %>% 
+  # group_by(gruppo) %>% 
+  # summarize(media_trattamenti = mean(n_trattamenti, na.rm = TRUE), sderr_trattamenti = sd(n_trattamenti, na.rm = TRUE)/sqrt(n())) %>% 
+  
+  ggplot(aes(gruppo, n_trattamenti)) +
+      geom_violin() 
+
+```
+
+**Si in generale chi viene per un propblema specifico fa mediamente una visita in piu
+ 
+ 
+Se e' vero che le percone con parto cesareo hanno in generale piu' problemi, ed e' per quello che vengono piu' spesso, allora dovrebbero esserci piu' soggetti con parto cesareo che non vengono per una visita generale. Questo non sembra supportato dai dati. 
+
+```{r tipo_parto_mdc_1}
+dat_year %>% 
+  drop_na(tipo_parto) %>% 
+  mutate(gruppo = if_else(mdc_1 == "visita_generale", "visita generale", "problema specifico")) %>% 
+  group_by(gruppo) %>% 
+  mutate(tot_g = n()) %>% 
+  group_by(gruppo, tipo_parto) %>% 
+  summarize(n = n(), perc = n/first(tot_g) * 100) %>% 
+  
+  ggplot(aes(tipo_parto, perc, fill = gruppo)) +
+    geom_col(position = "dodge")
+```
+
+Quelli che vengono da un parto cesareo hanno mediamente piu visite? No, non sembra proprio che regge.
+
+```{r}
+dat_year %>% 
+  drop_na(tipo_parto, n_trattamenti) %>% 
+  mutate(gruppo = if_else(mdc_1 == "visita_generale", "visita generale", "problema specifico")) %>% 
+  group_by(tipo_parto) %>% 
+  summarize(media_trattamenti = mean(n_trattamenti), sderr_trattamenti = sd(n_trattamenti, na.rm = TRUE)/sqrt(n()))   %>% 
+  
+  ggplot(aes(reorder(tipo_parto, media_trattamenti), media_trattamenti)) +
+      geom_col() +
+      geom_linerange(aes(ymin = media_trattamenti - sderr_trattamenti, ymax = media_trattamenti + sderr_trattamenti)) 
+```
 
 
 
 
-
-
+# ```{r}
+# dat_clean %>% 
+#   mutate(tot = n()) %>% 
+#   group_by(mdc_1, tipo_parto) %>% 
+#   summarize(n = n(),  tot  = first(tot), perc_mdc_1 = round(n/first(tot) * 100, 1), .groups = "drop_last") %>% 
+#   slice_max(perc_mdc_1, n = 10) %>% 
+# 
+#   ggplot(aes(perc_mdc_1, reorder(mdc_1, perc_mdc_1))) +
+#       geom_col(col = "black", position = position_dodge2(), aes(fill = tipo_parto)) +
+#       scale_x_continuous(labels = scales::label_percent(scale = 1)) +
+#       scale_y_discrete(labels = bei_nomi) +
+# 
+#       labs(
+#         x = NULL,
+#         y = NULL, 
+#         title = " I dieci motivi di consulto piú frequenti"
+#       )
+# ```
 
 
 
@@ -343,7 +476,7 @@ dat_clean %>%
 dat_clean %>% 
   select(where(is.numeric)) %>% 
     cor(use = "pairwise.complete.obs") %>%
-    ggcorrplot(hc.order = TRUE, tl.cex = 8, lab = TRUE, lab_size = 3) 
+    ggcorrplot(hc.order = TRUE, lab = TRUE, lab_size = 3) 
 ```
 
 
