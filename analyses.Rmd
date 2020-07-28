@@ -156,7 +156,9 @@ Non so qui che bisogna mettere.
 
 Nel corso di 3 anni (2017-2019), il nostro studio ha registrato informazioni riguardanti il trattamento osteopatico di 1288 pazienti, di cui il 58% (745) di sesso maschile. L'età dei soggetti é compresa tra un  1 mese e i 16 anni, con il 76% (979) dei pazienti di età non superiore all'anno di vita (fig.1). 
 
-Il tipo di parto più frequente è quello cesareo, 46% (577), seguito da quello vaginale e quello vaginale operativo, 42% (534) e 12% (154), rispettivamente (fig.2). Il 13% (159) dei soggetti è nato a sequito di fecondazione assistita e il 10% (130) in parto di tipo gemellare.
+
+<span style="color:red"> QUESTO VA CAMBIATO 
+Il tipo di parto più frequente è quello cesareo, 46% (577), seguito da quello vaginale e quello vaginale operativo, 42% (534) e 12% (154), rispettivamente (fig.2). Il 13% (159) dei soggetti è nato a sequito di fecondazione assistita e il 10% (130) in parto di tipo gemellare. </span>
 
 
 <!-- 
@@ -226,9 +228,7 @@ dat_clean %>%
 ```
 
 
-
 ```{r plot_eta_sesso}
-
 dat_clean %>% 
   mutate(eta_paziente = floor(eta_paziente/12)) %>% 
   group_by(sesso) %>% 
@@ -253,7 +253,7 @@ dat_clean %>%
    theme(legend.position = "none",
          strip.background =element_rect(fill = "grey90"))
 
-ggsave(here("figs", "fig_eta_sesso.png"))
+# ggsave(here("figs", "fig_eta_sesso.png"))
 ```
 
 
@@ -268,6 +268,7 @@ dat_clean %>%
   write_csv(x = ., here("tabs", "tab_tipo_parto.csv"))
 ```
 
+**Forse questo vale la pena cambiarlo ad un annno*
 
 ```{r tipi_parto}
 dat_clean %>% 
@@ -288,7 +289,7 @@ dat_clean %>%
          x = NULL,
          title = "Tipo di parto") 
 
-ggsave(here("figs", "fig_tipo_parto.png"))
+# ggsave(here("figs", "fig_tipo_parto.png"))
 ```
 
 
@@ -299,7 +300,7 @@ ggsave(here("figs", "fig_tipo_parto.png"))
 dat_clean %>% 
   drop_na(tipo_parto) %>% 
   group_by(tipo_parto) %>% 
-  summarize(peso_medio = mean(peso/1000, na.rm = TRUE), peso_sd = sd((peso/1000), na.rm = TRUE)) %>% 
+  summarize(peso_medio = mean(peso/1000, na.rm = TRUE), peso_sd = sd((peso/1000), na.rm = TRUE), .groups = "drop_last") %>% 
   ggplot(aes(tipo_parto, peso_medio)) +
     geom_col() +
     geom_linerange(aes(ymin = peso_medio + peso_sd, ymax = peso_medio - peso_sd)) +
@@ -328,8 +329,7 @@ dat_clean %>%
 
 # Motivi di consulto
 
-
-Un anno o meno
+Un anno o meno.
 
 ```{r}
 dat_year <- dat_clean %>% 
@@ -339,7 +339,7 @@ dat_year <- dat_clean %>%
 
 
 ```{r tab_perc_medc_1}
-top_mdc_1 <- dat_clean %>% 
+top_mdc_1 <- dat_year %>% 
   mutate(tot = n()) %>% 
   group_by(mdc_1) %>% 
   summarize(n = n(),  tot  = first(tot), perc_mdc_1 = round(n/first(tot) * 100, 1), .groups = "drop_last") %>% 
@@ -378,13 +378,43 @@ dat_clean %>%
       labs(
         x = NULL,
         y = NULL, 
-        title = " I dieci motivi di consulto piú frequenti"
+        title = " I dieci motivi di consulto piú frequenti (tutti i dati)"
       )
 
-ggsave(here("figs", "fig_mdc1.png"))
+bei_nomi2 <- c(
+  "dismorfismi_cf" ="dismorfirsmi cranio facciali",
+  "visita generale" = "visita generale",
+  "reflusso_ger" = "reflusso ger",
+  "torcicolli_posturali" = "torcicolli posturali",
+  "disturbi_del_sonno" = "disturbi del sonno",
+  "coliche_stipsi_o_dolori_addominali" = "coliche, stipsi o dolori addominali",
+  "piedi_torti" = "piedi torti",
+  "alterazioni_tono_muscolare" = "alterazioni tono muscolare"
+)
+
+
+dat_year %>% 
+  mutate(tot = n()) %>% 
+  group_by(mdc_1) %>% 
+  summarize(n = n(),  tot  = first(tot), perc_mdc_1 = round(n/first(tot) * 100, 1), .groups = "drop_last") %>% 
+  slice_max(perc_mdc_1, n = 10) %>% 
+
+  ggplot(aes(perc_mdc_1, reorder(mdc_1, perc_mdc_1))) +
+  scale_x_continuous(labels = scales::label_percent(scale = 1), limits = c(0, 60)) +
+  scale_y_discrete(labels = bei_nomi2) +
+      geom_col(col = "black", fill = "grey70") +
+      labs(
+        x = NULL,
+        y = NULL, 
+        title = " I dieci motivi di consulto piú frequenti (un anno o meno)"
+      )
+
+# ggsave(here("figs", "fig_mdc1_1anno.png"))
 ```
  
 # Un anno o meno
+
+Se vogliamo vedere qualcosa conviene fermarci ad un anno.
 
 Visita generale e' piu' sano di uno che viene per trattamento specifico? Allora ti aspetti che faccia meno visite...
 
@@ -393,7 +423,7 @@ dat_year %>%
   drop_na(tipo_parto) %>% 
   mutate(gruppo = if_else(mdc_1 == "visita_generale", "visita generale", "problema specifico"))  %>% 
   group_by(gruppo) %>% 
-  summarize(media_trattamenti = mean(n_trattamenti, na.rm = TRUE), sderr_trattamenti = sd(n_trattamenti, na.rm = TRUE)/sqrt(n())) %>% 
+  summarize(media_trattamenti = mean(n_trattamenti, na.rm = TRUE), sderr_trattamenti = sd(n_trattamenti, na.rm = TRUE)/sqrt(n()), .groups = "drop_last") %>% 
   
   ggplot(aes(gruppo, media_trattamenti)) +
       geom_col() +
@@ -409,13 +439,12 @@ dat_year %>%
   
   ggplot(aes(gruppo, n_trattamenti)) +
       geom_violin() 
-
 ```
 
-**Si in generale chi viene per un propblema specifico fa mediamente una visita in piu
+**Si in generale chi viene per un problema specifico fa mediamente una visita in piu**
  
  
-Se e' vero che le percone con parto cesareo hanno in generale piu' problemi, ed e' per quello che vengono piu' spesso, allora dovrebbero esserci piu' soggetti con parto cesareo che non vengono per una visita generale. Questo non sembra supportato dai dati. 
+Se e' vero che le persone con parto cesareo hanno in generale piu' problemi, ed e' per quello che vengono piu' spesso, allora dovrebbero esserci piu' soggetti con parto cesareo che non vengono per una visita generale. 
 
 ```{r tipo_parto_mdc_1}
 dat_year %>% 
@@ -424,13 +453,15 @@ dat_year %>%
   group_by(gruppo) %>% 
   mutate(tot_g = n()) %>% 
   group_by(gruppo, tipo_parto) %>% 
-  summarize(n = n(), perc = n/first(tot_g) * 100) %>% 
+  summarize(n = n(), perc = n/first(tot_g) * 100, .groups = "drop_last") %>% 
   
   ggplot(aes(tipo_parto, perc, fill = gruppo)) +
     geom_col(position = "dodge")
 ```
+Si piu per visite specifiche ma molto piccola la differenza, ma forse la misura non e' sensibile abbastanza.
 
-Quelli che vengono da un parto cesareo hanno mediamente piu visite? No, non sembra proprio che regge.
+Quelli che vengono da un parto cesareo hanno mediamente piu visite? Piu o meno, si potrebbe regge.
+
 
 ```{r}
 dat_year %>% 
@@ -444,27 +475,36 @@ dat_year %>%
       geom_linerange(aes(ymin = media_trattamenti - sderr_trattamenti, ymax = media_trattamenti + sderr_trattamenti)) 
 ```
 
+```{r}
+top_3 <- as.character(top_mdc_1[1:3])
+
+dat_year %>% 
+  drop_na(tipo_parto, sesso) %>% 
+  filter(mdc_1 %in% top_3) %>%  
+  
+  ggplot(aes(mdc_1, peso, col = sesso)) +
+    geom_boxplot() +
+    facet_grid(vars(sesso), vars(tipo_parto)) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  
+  
+dat_year %>% 
+  drop_na(tipo_parto, sesso) %>% 
+  filter(mdc_1 %in% top_3) %>% 
+  group_by(tipo_parto, sesso) %>% 
+  mutate(tot =n()) %>% 
+  group_by(mdc_1, tipo_parto, sesso) %>% 
+  summarize(n = n(), perc = n/first(tot) * 100, .groups = "drop_last") %>% 
+  
+  ggplot(aes(mdc_1, perc, fill = sesso)) +
+    geom_col() +
+    facet_grid(vars(sesso), vars(tipo_parto)) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  
 
 
 
-# ```{r}
-# dat_clean %>% 
-#   mutate(tot = n()) %>% 
-#   group_by(mdc_1, tipo_parto) %>% 
-#   summarize(n = n(),  tot  = first(tot), perc_mdc_1 = round(n/first(tot) * 100, 1), .groups = "drop_last") %>% 
-#   slice_max(perc_mdc_1, n = 10) %>% 
-# 
-#   ggplot(aes(perc_mdc_1, reorder(mdc_1, perc_mdc_1))) +
-#       geom_col(col = "black", position = position_dodge2(), aes(fill = tipo_parto)) +
-#       scale_x_continuous(labels = scales::label_percent(scale = 1)) +
-#       scale_y_discrete(labels = bei_nomi) +
-# 
-#       labs(
-#         x = NULL,
-#         y = NULL, 
-#         title = " I dieci motivi di consulto piú frequenti"
-#       )
-# ```
+```
 
 
 
@@ -486,7 +526,7 @@ dat_clean %>%
 <!-- https://stats.idre.ucla.edu/r/dae/multinomial-logistic-regression/ -->
 
 ```{r results ='asis', message=FALSE}
-m1 <- dat_clean %>%
+# m1 <- dat_clean %>%
 #   filter(codice_mdc_1 %in% !! unlist(to_filter)) %>% 
 #   mutate(mdc_1 = droplevels(mdc_1)) %>% 
 #   select(mdc_1 , sesso, tipo_di_parto, eta_della_madre_al_momento_del_parto) %>%
