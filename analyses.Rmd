@@ -33,6 +33,7 @@ library(broom)
 library(skimr)
 library(nnet)
 library(stargazer)
+library(splines)
 
 theme_set(theme_bw())
 ```
@@ -462,19 +463,6 @@ Si piu per visite specifiche ma molto piccola la differenza, ma forse la misura 
 
 Quelli che vengono da un parto cesareo hanno mediamente piu visite? Piu o meno, si potrebbe regge.
 
-
-```{r}
-dat_year %>% 
-  drop_na(tipo_parto, n_trattamenti) %>% 
-  mutate(gruppo = if_else(mdc_1 == "visita_generale", "visita generale", "problema specifico")) %>% 
-  group_by(tipo_parto) %>% 
-  summarize(media_trattamenti = mean(n_trattamenti), sderr_trattamenti = sd(n_trattamenti, na.rm = TRUE)/sqrt(n()))   %>% 
-  
-  ggplot(aes(reorder(tipo_parto, media_trattamenti), media_trattamenti)) +
-      geom_col() +
-      geom_linerange(aes(ymin = media_trattamenti - sderr_trattamenti, ymax = media_trattamenti + sderr_trattamenti)) 
-```
-
 ```{r}
 top_3 <- as.character(top_mdc_1[1:3])
 
@@ -486,29 +474,61 @@ dat_year %>%
     geom_boxplot() +
     facet_grid(vars(sesso), vars(tipo_parto)) +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-  
-  
+
+
 dat_year %>% 
-  drop_na(tipo_parto, sesso) %>% 
-  filter(mdc_1 %in% top_3) %>% 
-  group_by(tipo_parto, sesso) %>% 
-  mutate(tot =n()) %>% 
-  group_by(mdc_1, tipo_parto, sesso) %>% 
-  summarize(n = n(), perc = n/first(tot) * 100, .groups = "drop_last") %>% 
+  drop_na(tipo_parto) %>% 
+  mutate(mdc_1 = if_else(mdc_1 %in% top_3, as.character(mdc_1), "altro")) %>% 
+  group_by(tipo_parto) %>% 
+  mutate(tot_g = n()) %>% 
+  group_by(mdc_1, tipo_parto) %>% 
+  summarize(n = n(), perc = n/first(tot_g) * 100, .groups = "drop_last") %>% 
   
-  ggplot(aes(mdc_1, perc, fill = sesso)) +
-    geom_col() +
-    facet_grid(vars(sesso), vars(tipo_parto)) +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-  
-
-
-
+  ggplot(aes(tipo_parto, perc, fill = mdc_1)) +
+    geom_col(position = "dodge")  
 ```
 
 
 
- 
+
+```{r}
+dat_year %>% 
+  drop_na(tipo_parto, n_trattamenti) %>% 
+  group_by(tipo_parto) %>% 
+  summarize(media_trattamenti = mean(n_trattamenti), sderr_trattamenti = sd(n_trattamenti, na.rm = TRUE)/sqrt(n()))   %>% 
+  
+  ggplot(aes(reorder(tipo_parto, media_trattamenti), media_trattamenti)) +
+      geom_col() +
+      geom_linerange(aes(ymin = media_trattamenti - sderr_trattamenti, ymax = media_trattamenti + sderr_trattamenti)) 
+```
+
+
+```{r}
+dat_year %>% 
+  drop_na(tipo_parto, sesso) %>% 
+  group_by(tipo_parto, sesso, ) %>% 
+  summarize(media_trattamenti = mean(n_trattamenti, na.rm = TRUE), sderr_trattamenti = sd(n_trattamenti, na.rm = TRUE)/sqrt(n()), .groups = "drop_last") %>% 
+
+  
+  ggplot(aes(tipo_parto, media_trattamenti, fill = sesso)) +
+    geom_col() +
+    facet_grid(vars(sesso), vars(tipo_parto)) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+```{r}
+library(car)
+mean(dat_year$n_trattamenti, na.rm = TRUE)
+var(dat_year$n_trattamenti, na.rm = TRUE)
+
+model <- glm(n_trattamenti ~ tipo_parto +sesso + eta_madre_parto + n_gravidanze - 1, quasipoisson(link = "log"), data = dat_year)
+
+summary(model)
+plot(model)
+vif(model)
+
+```
+
  
 # Correlazioni
 
@@ -516,7 +536,7 @@ dat_year %>%
 dat_clean %>% 
   select(where(is.numeric)) %>% 
     cor(use = "pairwise.complete.obs") %>%
-    ggcorrplot(hc.order = TRUE, lab = TRUE, lab_size = 3) 
+    ggcorrplot(hc.order = TRUE, lab = TRUE) 
 ```
 
 
